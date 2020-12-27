@@ -187,14 +187,14 @@ The result in \figref{fig:Sce1} shows the output states due to constant input $E
 	\label{fig:Sce1}
 \end{figure}
 
-The time simulation for the three solvers indicate that \texttt{ode45} is 10 times slower than \texttt{ode45m} and 30 times slower that \texttt{eufix1}. 
+The time simulation of each solver indicates that \texttt{ode45} is 10 times slower than \texttt{ode45m} and 30 times slower than \texttt{eufix1}. 
 \begin{table}[!ht]
 	\centering
 	\scalebox{1}{
 		\begin{tabular}{c|c|c|c}
 			                     & \bf{ode45} & \bf{ode45m} & \bf{eufix1} \\
 			\hline
-			  simulation time    & $0.267[s]$ & $0.025[s]$  & $0.009[s]$  \\
+			  simulation time [s]   & $0.267$ & $0.025$  & $0.009$  \\
 			\hline
 			number of time steps &  $71769$   &   $15133$   &   $80001$
 		\end{tabular} 		
@@ -211,7 +211,7 @@ The temperature of the motor $\theta_M$ increases linearly and reaches steady-st
 	\label{fig:Sce1_thetaM}
 \end{figure}
 
-Although, \texttt{eufix1} is the fastest solver, with step size of $1\times 10^{-3}$, \texttt{eufix1} outputs the worst performance. The result can be improved if the steps size is decreased to $1\times 10^{-4}$. \figref{fig:Sce1_zoom_a} and \figref{fig:Sce1_zoom_b} shows the relative error at max current and max angular velocity between \texttt{ode45} and \texttt{eufix1}.
+Although, \texttt{eufix1} is the fastest solver, with step size of $1\times 10^{-3}$, \texttt{eufix1} outputs the worst performance. The result can be improved if the steps size is decreased to $1\times 10^{-4}$. \figref{fig:Sce1_zoom_a} and \figref{fig:Sce1_zoom_b} show the relative error at max current and max angular velocity between \texttt{ode45} and \texttt{eufix1}.
 
 \begin{figure}[H]
 	\centering
@@ -236,7 +236,7 @@ In this scenario we submitted the DC motor to high stiction $B_{2C}=300$ and sin
 		\begin{tabular}{c|c|c|c}
 			                     &  \bf{ode45}  & \bf{ode45m} & \bf{eufix1} \\
 			\hline
-			  simulation time    & $517.798[s]$ & $3.463[s]$  & $0.093[s]$  \\
+			  simulation time [s]   & $517.798$ & $3.463$  & $0.093$  \\
 			\hline
 			number of time steps &  $13559913$  &   $9647$    &   $3002$
 		\end{tabular} 		
