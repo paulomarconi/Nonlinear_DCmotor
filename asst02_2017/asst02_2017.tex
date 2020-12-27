@@ -1,7 +1,7 @@
 \documentclass[]{article}
 \usepackage[top=2.5cm, bottom=2.5cm, left=3cm, right=3cm]{geometry}
 \usepackage{amsmath,amssymb,amsfonts,latexsym,textcomp} %paquetes matematicos
-\usepackage{array,multirow,booktabs,tabulary} %tablas y arrays
+\usepackage{array,multirow,multicol,booktabs,tabulary} %tablas y arrays
 \usepackage{graphicx}   
 \usepackage{caption,float,subfigure} %float=figuras flotantes.
 \usepackage{verbatim}  %texto raw 
@@ -75,172 +75,203 @@
 % [2]=numero de argumentos, #1=argumento 1, #2=argumento 2
 \newcommand{\includecode}[2]{\lstinputlisting[language=#1, caption=#2, label=#2]{#2}}			
 
+% --- Fig and table command -----------------------------------------------
+%\newcommand{\figref}[1]{\figurename~\ref{#1}}
+\newcommand{\figref}[1]{Fig.~\ref{#1}}
+\newcommand{\tabref}[1]{Table~\ref{#1}}
+\newcommand{\algref}[1]{Algorithm~\ref{#1}}
+
+
 %=============================================================================================
 %opening
 \title{EE4323 Industrial Control Systems\\ 
-	Homework Assignment 2}
+		Homework Assignment 2\\
+		\underline{Nonlinear DC moto}r}
 \author{Paulo R. Loma Marconi}
+\date{June 13, 2017}
 
 \begin{document}
 \maketitle
 
-\section{Raw model}
+\section{Introduction}
+The objective is to simulate a nonlinear electro-mechanical system with thermal model and static Coulomb friction. We use three ODE solvers, the embedded Matlab solver \texttt{ode45}, and two external solvers, the 4th and 5th order Runge-Kutta algorithm \texttt{ode45m}, and the basic Euler algorithm \texttt{eufix1}.
+
+\section{Nonlinear model}
+The dynamics of the DC motor has two nonlinear parameters is, 
+\begin{align}
+	R_A i_A + L_A \dot{i}_A+\alpha \omega_1                             & = e_{i}(t)   \\
+	J_1 \dot{\omega}_1 + B_1 \omega_1 - r_1 f_c                         & = \alpha i_A \\
+	J_2 \dot{\omega}_2 + B_2 \omega_2 + B_{2C}~sign(\omega_2) + r_2 f_c & = -\tau_{L}  \\
+	C_{TM} \dot{\theta}_M + \frac{(\theta_M-\theta_A)}{R_{TM}}          & = i^2_A R_A
+\end{align}
+where $R_A$ is the stationary resistance, $L_A$ is the stationary inductance, $i_A$ is the input stationary current, $\alpha$ is the internal parameters, $\omega$ is the angular speed, $e_i(t)$ is the applied armature voltage, $B$ is the rotational viscous-damping coefficient, $J$ is the moment of inertia, $f_c$ is the contact force between two gears, $r$ is the gear radius, and $B_{2C}$ is the static Coulomb friction. The thermal model is similar to an electrical capacitor-resistor model with thermal capacity $C_{TM}$, $R_{TM}$ is the resistive losses to ambient temperature, $\theta_M$ is the motor temperature, and $\theta_A$ is the ambient temperature. 
+
+Now let us define the sate-vector differential equations: state vector $x = [ i_A~ \omega_2~ \theta_M ]^T $, and input vector $u = [ e_{i}~ \tau_{L}~ \theta_A ]^T$. 
+
+For $\omega_1=N \omega_2$ and $N=\frac{r_2}{r_1}$, eliminating $f_c$ we have
 
 \begin{align}
-e_{in}(t) &= R_A\ i_A + L_A\ \dot{i_A}+\alpha\ \omega_1 \\
-J_1\ \dot{\omega_1} + B_1\ \omega_1 &= \alpha\ i_A + R_1\ f_c \\
-J_2\ \dot{\omega_2} + B_2\ \omega_2 + B_{2C}\ sign(\omega_2) &= -\tau_{LE}-R_2\ f_c \\
-C_{TM}\ \dot{\theta_M} + (\theta_M - \theta_A)/R_{TM} &= i^2_A\ R_A
+	\dot{i}_A      & = -\frac{R_A}{L_A}\ i_A - \frac{N \alpha}{L_A} \omega_2 + \frac{1}{L_A} e_{i}                         \\
+	\dot{\omega}_2 & = \frac{N \alpha}{J_{eq}} i_A - \frac{B_{eq}}{J_{eq}} \omega_2 - \frac{B_{2C}}{J_{eq}} sign(\omega_2) - \frac{1}{J_eq}\tau_{L} \\
+	\dot{\theta}_M & = \frac{R_A}{C_{TM}} i^2_A - \frac{1}{C_{TM} R_{TM}} \theta_M + \frac{1}{C_{TM} R_{TM}} \theta_A
 \end{align}
+where $J_{eq}=J_2+N^2 J_1$ and $B_{eq}=B_2+N^2 B_1$. 
 
-Which delivers in sate-vector differential equations  
-$x = [ i_A\ \omega_2\ \theta_M ]^T $ and input $u = [ e_{in}\ \tau_{LE}\ \theta_A ]^T$.
-
+For simulation purpose only we can simplify as 
 \begin{align}
-\dot{i_A} &= -a\ i_A - b\ \omega_2 + e_{in}/L_A \\
-\dot{\omega}_2 &= c\ i_A - d\ \omega_2 - e\ sign(\omega_2) - \tau_{LE}/J_{eq}\\
-\dot{\theta}_M &= f\ i^2_A - g\ \theta_M + g\ \theta_A
+	\dot{i}_A      & = -a~ i_A - b~ \omega_2 + \frac{1}{L_A}e_{i}                        \\
+	\dot{\omega}_2 & = c~ i_A - d~ \omega_2 - e~ sign(\omega_2) - \frac{1}{J_eq}\tau_{L} \\
+	\dot{\theta}_M & = f~ i^2_A - g~ \theta_M + g~ \theta_A
 \end{align}
+where $a=\frac{R_A}{L_A}$, $b=\frac{N \alpha}{L_A}$, $c=\frac{N \alpha}{J_{eq}}$, $d=\frac{B_{eq}}{J_{eq}}$, $e=\frac{B_{2C}}{J_{eq}}$, $f=\frac{R_A}{C_{TM}}$, and $g=\frac{1}{C_{TM} R_{TM}}$.
 
-Where,
-\begin{align*}
-&J_{eq}=J_2+N^2\ J_1;\quad B_{eq}=B_2+N^2\ B_1\\
-&a=R_A/L_A;\quad b=\alpha\ N/L_A\\
-&c=N\ \alpha/J_{eq};\quad d=B_{eq}/J_{eq};\quad e=B_{2C}/J_{eq}\\
-&f=R_A/C_{TM};\quad g=1/(C_{TM} R_{TM})
-\end{align*}
 
-\section{Code and simulation}
-In \verb|asst02.m| it can be seen the input and the state-vector differential equations, and \verb|run asst02.m| is the code for the simulation of  Fig.\ref{fig:point2}.
 
-\begin{lstlisting}[language=matlab, caption={asst02.m}, label={asst02}]
-function xdot = asst02_2017(t,x)
-global E_0 Tau_0 T_Amb B_2C %%% make these settable from a script
-% motor parameters, Nachtigal, Table 16.5 p. 663
-J_1 = 0.0035; % in*oz*s^2/rad
-B_1 = 0.064; % in*oz*s/rad
-% electrical/mechanical relations
-K_E = 0.1785; % back emf coefficient, e_m = K_E*omega_m (K_E=alpha for omega)
-K_T = 141.6*K_E; % torque coeffic.; in English units K_T is not = K_E! (K_T=alpha for iA) 
-R_A = 8.4; % Ohms
-L_A = 0.0084; % H
-% gear-train and load parameters
-J_2 = 0.035; % in*oz*s^2/rad % 10x motor J
-B_2 = 2.64; % in*oz*s/rad (viscous)
-N = 8; % motor/load gear ratio; omega_1 = N omega_2
-% Thermal model parameters
-R_TM = 2.2; % Kelvin/Watt
-C_TM = 9/R_TM; % Watt-sec/Kelvin (-> 9 sec time constant - fast!)
+\section{Matlab Scripts}
 
-Jeq=J_2+N*2*J_1;
-Beq=B_2+N^2*B_1;
-a=R_A/L_A;
-b=K_E*N/L_A;
-c=N*K_T/Jeq;
-d=Beq/Jeq;
-e=B_2C/Jeq;
-f=R_A/C_TM;
-g=1/(C_TM*R_TM);
+\subsection{ODE solver \texttt{ode45m}}
+\lstinputlisting[language=matlab,caption={ode45m},label={cod:}]{../Matlab/ode45m.m}
 
-if t < 0.05,
-	e_i = 0;
-else  
-	e_i = E_0;  
-	%e_i = E_0*sin(2*pi*5*(t - 0.05)); 
-end
-if t < 0.5
-	Tau_L = 0;
-else
-	Tau_L = Tau_0;
-end
+\subsection{ODE solver \texttt{eufix1}}
+\lstinputlisting[language=matlab,caption={eufix1},label={cod:}]{../Matlab/eufix1.m}
 
-xdot(1) = -a*x(1)-b*x(2)+e_i/L_A;
-xdot(2) = c*x(1)-d*x(2)-e*sign(x(2))-Tau_L/Jeq;
-xdot(3) = f*x(1)^2-g*x(3)+g*T_Amb;
-\end{lstlisting}
+\subsection{Nonlinear model}
+In line 37 and 38, the input $e_i$ can be changed from constant input to sinusoidal input.
+\lstinputlisting[language=matlab,caption={Nonlinear model},label={cod:}]{../Matlab/asst02_2017.m}
 
-\begin{lstlisting}[language=matlab, caption={run asst02.m}, label={runasst02}]
-clear; close all; clc;
-global E_0 Tau_0 T_Amb B_2C ;
+\subsection{Main}
+Change the input values in line 5-8, the \verb|input_type| $E_0$ to constant or sinusoidal, and the step size in line 9. 
 
-E_0 = 120; Tau_0 = 80; T_Amb = 18; B_2C = 80;
-t0 = 0; tfinal = 1.2; stp = 0.0001;
-x0 = [ 0;0;0 ]; %initial conditions
+\textbf{Note:} This script is an example only. In the \textbf{Simulation Results} section we will analyze different scenarios.
 
-timer = clock;
-[t1,x1] = ode45m('asst02_2017',t0,tfinal,x0,stp);
-Tsim1 = etime(clock,timer), % integration time 
-Len1 = length(t1), % number of time-steps
+\lstinputlisting[language=tex,caption={Main},label={cod:}]{../Matlab/run_asst02_2017.m}
 
-figure
+\section{Simulation scenarios}
+Two types of scenarios are simulated, \tabref{tab:Sce_1-2}. The first one is submitted to a constant input, low stiction, and two step sizes. The second scenario is more interesting because we study the behaviour due to a sinusoidal input which emulates the reversing mode of the motor at $5[Hz]$ with higher stiction. Both scenarios have load torque at $t=0.2[s]$.
 
-subplot(3,1,1)       
-plot(t1,x1(:,1));
-title('Motor+Load+thermal model simulation, B_{2C}=80')
-xlabel('Time, t (sec)')
-ylabel('i_A (amperes)')
-text(0.2,1,['E_0 =',num2str(E_0,3)]);
-
-subplot(3,1,2)       
-plot(t1,x1(:,2));
-title('Motor+Load+thermal model simulation, B_{2C}=80')
-xlabel('Time, t (sec)')
-ylabel('\omega_2 , Motor angular velocity (rad/sec)')
-text(0.2,24,['B_{2C} =',num2str(B_2C,3),'\tau_0 =',num2str(Tau_0,3)]);
-
-subplot(3,1,3)      
-plot(t1,x1(:,3));
-title('Motor+Load+thermal model simulation, B_{2C}=80')
-xlabel('Time, t (sec)')
-ylabel('\theta_M (deg)')
-text(0.2,5,['\Theta_A=',num2str(T_Amb,3) ' deg']);
-
-\end{lstlisting}
-
-\begin{figure}
+\begin{table}[!ht]
 	\centering
-	\includegraphics[width=1\linewidth]{point2}
-	\caption{Simulation for Q. 2}
-	\label{fig:point2}
+	\scalebox{1}{
+		\begin{tabular}{c|l|l|l|l}
+			&     \multicolumn{2}{c|}{\bf{Scenario 1}}      &       \multicolumn{2}{c}{\bf{Scenario 2}}       \\
+			\hline
+			\texttt{ode45m} step size & $1\times 10^{-3}$ & $1\times 10^{-4}$         & \multicolumn{2}{l}{$1\times 10^{-4}$}           \\
+			\hline
+			\texttt{eufix1} step size & $1\times 10^{-3}$ & $1\times 10^{-4}$         & \multicolumn{2}{l}{$1\times 10^{-4}$}           \\
+			\hline
+			\texttt{ode45} step size  & \multicolumn{2}{l|}{auto}                     & \multicolumn{2}{l}{auto}                        \\
+			\hline
+			$e_i$           & \multicolumn{2}{l|}{$E_0$}                    & \multicolumn{2}{l}{$E_0 \sin[5(2\pi)(t-0.05)]$} \\
+			\hline
+			$E_0$           & \multicolumn{2}{l|}{$120~[V]$}                & \multicolumn{2}{l}{$120~[V]$}                   \\
+			\hline
+			$\tau_{L}$         & \multicolumn{2}{l|}{$80~[N m]$ at $t=0.2[s]$} & \multicolumn{2}{l}{$80~[N m]$ at $t=0.2[s]$}    \\
+			\hline
+			$\theta_A$         & \multicolumn{2}{l|}{$18~[\degree C]$}         & \multicolumn{2}{l}{$18~[\degree C]$}            \\
+			\hline
+			$B_{2C}$          & \multicolumn{2}{l|}{$80~[N]$}                 & \multicolumn{2}{l}{$300~[N]$}
+		\end{tabular} 		
+	}
+	\caption{Scenario 1 and 2.}
+	\label{tab:Sce_1-2}
+\end{table}
+
+\section{Simulation Results}
+\subsection*{Scenario 1}
+The result in \figref{fig:Sce1} shows the output states due to constant input $E_0=120$, and $B_{2C}=80$. The current overshoot at $0.05[s]$ is due to the inertia that the motor has to overcome. After the inertia is broken, the current $i_A$ drops down to a constant value. The load torque $\tau_{L}$ is applied at $0.2[s]$ which produces the increment in the current and the decrement in the angular velocity. Also, \texttt{eufix1} solves the system with noticeable error, this result is analyzed later. 
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\linewidth]{E0_ode45-ode45m-eufix1_1e-3}
+	\caption{Scenario 1: step size $1\times 10^{-3}$}
+	\label{fig:Sce1}
 \end{figure}
 
-The high current peak in before 0.1 sec is because of the inertia that the motor has to overcome, after it breaks the inertia the amount of current drops down to a constant value. In 0.5 sec the $\tau_{LE}$ is applied and we can see an increment of the current and a decrease of the angular velocity.
-
-\section{Ode45 vs eufix1}
-In Fig.\ref{fig:ode45_vs_eufix1} can be seen that the \textbf{maximum peak current} for ode45 and eufix1 at two different integration steps, \textbf{1e-4} and \textbf{1e-3}.
-
-\begin{figure}
+The time simulation for the three solvers indicate that \texttt{ode45} is 10 times slower than \texttt{ode45m} and 30 times slower that \texttt{eufix1}. 
+\begin{table}[!ht]
 	\centering
-	\subfigure[ode45 with step=1e-4]{\includegraphics[width=0.45\linewidth]{ode45_1e-4.png}}
-	\subfigure[eufix1 with step=1e-4]{\includegraphics[width=0.43\linewidth]{eufix1_1e-4.png}}
-	\subfigure[ode45 with step=1e-3]{\includegraphics[width=0.43\linewidth]{ode45_1e-3.png}}
-	\subfigure[eufix1 with step=1e-3]{\includegraphics[width=0.45\linewidth]{eufix1_1e-3.png}}
-	\caption{Maximum peak current with \textbf{ode45 vs eufix1}}
-	\label{fig:ode45_vs_eufix1}
+	\scalebox{1}{
+		\begin{tabular}{c|c|c|c}
+			                     & \bf{ode45} & \bf{ode45m} & \bf{eufix1} \\
+			\hline
+			  simulation time    & $0.267[s]$ & $0.025[s]$  & $0.009[s]$  \\
+			\hline
+			number of time steps &  $71769$   &   $15133$   &   $80001$
+		\end{tabular} 		
+	}
+	\caption{Scenario 1: simulation time and number of steps.}
+	\label{tab:}
+\end{table}
+
+The temperature of the motor $\theta_M$ increases linearly and reaches steady-state at $45[s]$ approximately, which indicates that the motor won't reach unsafe temperatures.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.65\linewidth]{thetaM_ode45-ode45m-eufix1_1e-3}
+	\caption{Scenario 1: $\theta_M$ over $80[s]$}
+	\label{fig:Sce1_thetaM}
 \end{figure}
 
-There is little difference between ode45 and eufix at step=1e-4 but when we change to step=1e-3 there a big difference, about 70\% more.
+Although, \texttt{eufix1} is the fastest solver, with step size of $1\times 10^{-3}$, \texttt{eufix1} outputs the worst performance. The result can be improved if the steps size is decreased to $1\times 10^{-4}$. \figref{fig:Sce1_zoom_a} and \figref{fig:Sce1_zoom_b} shows the relative error at max current and max angular velocity between \texttt{ode45} and \texttt{eufix1}.
 
-The number of time steps is given by the instruction \verb|Len1 = length(t1),| which delivers two results, \verb|Len1 = 663| for \verb|ode45| and \verb|Len1 = 1202| for \verb|eufix1|.
-
-\section{Will the motor melt?}
-Fig.\ref{fig:melt} shows that the maximum temperature is 182.4\degree C at time 40 sec, which means that the heating it's not enough to melt the metal of the motor that could be around 700\degree C if it's made of Aluminum or 419\degree C if it has Zinc. 
-
-\begin{figure}
+\begin{figure}[H]
 	\centering
-	\includegraphics[width=1\linewidth]{melt}
-	\caption{Ode45 simulation with t = 40sec}
-	\label{fig:melt}
+	\includegraphics[width=0.80\linewidth]{E0_ode45-ode45m-eufix1_1e-3_zoom}
+	\caption{Scenario 1: step size $1\times 10^{-3}$}
+	\label{fig:Sce1_zoom_a}
 \end{figure}
 
-\section{Motor is continually reversing at 5Hz}
-Fig.\ref{fig:reversing} shows the result of 5 cycles with an 5Hz of input; \verb|e_i = E_0*sin(2*pi*5*(t - 0.05))|, and with a 6315 time steps for \verb|ode45| and 10002 time steps for \verb|eufix1|.
-\begin{figure}
+\begin{figure}[H]
 	\centering
-	\includegraphics[width=1\linewidth]{reversing}
-	\caption{Motor at 5Hz}
-	\label{fig:reversing}
+	\includegraphics[width=0.80\linewidth]{E0_ode45-ode45m-eufix1_1e-4_zoom}
+	\caption{Scenario 1: step size $1\times 10^{-4}$}
+	\label{fig:Sce1_zoom_b}
 \end{figure}
+
+\subsection*{Scenario 2}
+In this scenario we submitted the DC motor to high stiction $B_{2C}=300$ and sinsusoidal input at $5[Hz]$ which simulates the reversing mode. \tabref{tab:Sce2} shows the output for the three solvers showing that \texttt{ode45} is the slowest by far.
+
+\begin{table}[!ht]
+	\centering
+	\scalebox{1}{
+		\begin{tabular}{c|c|c|c}
+			                     &  \bf{ode45}  & \bf{ode45m} & \bf{eufix1} \\
+			\hline
+			  simulation time    & $517.798[s]$ & $3.463[s]$  & $0.093[s]$  \\
+			\hline
+			number of time steps &  $13559913$  &   $9647$    &   $3002$
+		\end{tabular} 		
+	}
+	\caption{Scenario 2: simulation time and number of steps.}
+	\label{tab:Sce2}
+\end{table}
+
+\figref{fig:Sce2} shows the simulation output. The relevant result is the behavior of the system around the (nonlinear) stiction. $\omega_2$ sticks at $0.15[s]$ and $0.25[s]$ due to $B_{2C}$. 
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.8\linewidth]{sinE0_ode45-ode45m-eufix1_1e-4}
+	\caption{Scenario 2: reversing mode.}
+	\label{fig:Sce2}
+\end{figure}
+
+Even though the solvers were able to solve the dynamics with stiction, \texttt{ode45} took too much time to overcome this nonlinearity. \figref{fig:Sce2_zoom} shows the stiction with three different zoom levels for each solver. The fastest but with more integration step error is \texttt{eufix1}. \texttt{ode45m} has less error $\pm 0.01$, and finally \texttt{ode45} solves with the minimum error, around $\pm 10\times 10^{-5}$. In conclusion, \texttt{ode45m} is the best choice against the rest because it can obtain the solution with low error and with decent speed.
+
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=1\linewidth]{sinE0_ode45-ode45m-eufix1_1e-4_zoom}
+	\caption{Scenario 2: stiction behavior at $0.148\leq t \leq 0.157$.}
+	\label{fig:Sce2_zoom}
+\end{figure}
+
+The motor temperature $\theta_M$ in reversing mode reaches the steady-state at $45[s]$ approximately which indicates the motor won't suffer overheat due to stiction. 
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.65\linewidth]{sinE0_thetaM_ode45-ode45m-eufix1_1e-4}
+	\caption{Scenario 2: motor temperature.}
+	\label{fig:Sce2_stiction}
+\end{figure}
+
+
 
 
 
